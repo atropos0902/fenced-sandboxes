@@ -1,0 +1,42 @@
+name: fenced
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment: {POSTGRES_PASSWORD: fenced, POSTGRES_DB: fenced}
+    healthcheck: {test: [CMD, pg_isready, -U, postgres], interval: 2s, retries: 20}
+  fakegithub:
+    build: {context: .., dockerfile: deploy/Dockerfile, target: fakegithub}
+    environment: {LLM_KEY: real-model-key}
+    ports: ["127.0.0.1:59000:9000"]
+  gate:
+    container_name: fenced-gate
+    build: {context: .., dockerfile: deploy/Dockerfile, target: fenced}
+    image: fenced:dev
+    command: [gate]
+    environment: &env
+      DATABASE_URL: postgres://postgres:fenced@postgres:5432/fenced
+      GITHUB_API: http://fakegithub:9000
+      GITHUB_GIT: http://fakegithub:9000
+      GITHUB_APP_ID: "1"
+      GITHUB_APP_KEY_FILE: /run/secrets/app.pem
+      PREVIEW_KEY: ${PREVIEW_KEY:?run through scripts/dev.sh}
+      LLM_KEY: real-model-key
+    volumes: ["./config.json:/etc/fenced/config.json:ro", "${APP_KEY:?run through scripts/dev.sh}:/run/secrets/app.pem:ro"]
+    ports: ["127.0.0.1:58091:8091"]
+    depends_on: {postgres: {condition: service_healthy}}
+  control:
+    image: fenced:dev
+    command: [control]
+    user: root   # for the Docker socket; only this process has it
+    environment:
+      <<: *env
+      LLM_KEY: ""
+      API_TOKEN: ${API_TOKEN:?run through scripts/dev.sh}
+      PREVIEW_URL: http://%s.preview.localhost:58091
+      RECONCILE_SECONDS: "5"
+      GRACE_SECONDS: "${GRACE_SECONDS:-20}"
+      LEASE_SECONDS: "25"
+      FAULT_LEAVE_OLD_SANDBOX: "${FAULT_LEAVE_OLD_SANDBOX:-0}"
+    volumes: ["./config.json:/etc/fenced/config.json:ro", "${APP_KEY}:/run/secrets/app.pem:ro", "/var/run/docker.sock:/var/run/docker.sock"]
+    ports: ["127.0.0.1:58090:8090"]
+    depends_on: {postgres: {condition: service_healthy}, gate: {condition: service_started}}

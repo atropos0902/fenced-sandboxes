@@ -1,0 +1,21 @@
+groups:
+  - name: fenced
+    rules:
+      - alert: ReconcilerStalled
+        expr: time() - fenced_reconciled_timestamp_seconds > 120
+        for: 2m
+        annotations: {runbook: docs/runbook.md#reconciler-stalled}
+      - alert: SandboxesLeaking
+        expr: increase(fenced_sandboxes_leaked_total[30m]) > 5
+        annotations: {runbook: docs/runbook.md#sandboxes-leaking}
+      - alert: PlatformFailures
+        expr: sum(rate(fenced_failures_total{owner="platform"}[15m])) > 0.2 * sum(rate(fenced_ready_seconds_count[15m]))
+        for: 10m
+        annotations: {runbook: docs/runbook.md#platform-failures}
+      - alert: SlowWarmStart
+        expr: histogram_quantile(0.95, sum by (le) (rate(fenced_ready_seconds_bucket{start="warm"}[15m]))) > 8
+        for: 15m
+        annotations: {runbook: docs/runbook.md#slow-warm-start}
+      - alert: StalePushRefused
+        expr: increase(fenced_stale_push_total[15m]) > 0
+        annotations: {runbook: docs/runbook.md#stale-push-refused}

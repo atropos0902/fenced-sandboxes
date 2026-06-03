@@ -1,0 +1,29 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env: {POSTGRES_PASSWORD: x}
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://postgres:x@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with: {go-version-file: go.mod}
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...
+  e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with: {go-version-file: go.mod}
+      - run: scripts/e2e.sh

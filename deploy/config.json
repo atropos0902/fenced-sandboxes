@@ -1,0 +1,23 @@
+{
+  "repos": [
+    {
+      "name": "demo/shop",
+      "base": "main",
+      "image": "fenced-sandbox:dev",
+      "setup": "npm ci",
+      "check": "npx tsc --noEmit && node --test",
+      "preview": "node src/server.ts",
+      "preview_port": 3000,
+      "setup_inputs": ["package.json", "package-lock.json"],
+      "allow_hosts": ["registry.npmjs.org"],
+      "creds": [
+        {"name": "llm", "base": "http://fakegithub:9000/llm", "header": "X-Api-Key", "secret_env": "LLM_KEY"}
+      ],
+      "limits": {"memory_mb": 512, "cpus": 1, "pids": 256},
+      "setup_seconds": 120,
+      "agent_seconds": 120,
+      "check_seconds": 60,
+      "preview_seconds": 10
+    }
+  ]
+}
